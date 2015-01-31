@@ -3,6 +3,8 @@ import sys
 import os
 import re
 from distutils.core import setup, Extension
+from os import makedirs
+import shutil
 
 DESCRIPTION = "Python wrapper for Google's RE2 using Cython"
 
@@ -38,7 +40,8 @@ import shutil
 
 PACKAGE_PATH =          os.path.abspath(os.path.dirname(__file__))
 MODULE_PATH =           pjoin(PACKAGE_PATH, 're2')
-RE2_SRC_PATH =          pjoin(MODULE_PATH, 'src', 're2_cpp')
+RE2_SRC_PATH =          pjoin(PACKAGE_PATH, 're2_cpp')
+RE2_INSTALL_PATH =      pjoin(MODULE_PATH, 'src', 're2_cpp')
 
 def get_long_description():
     with open(pjoin(PACKAGE_PATH, "README.rst")) as readme_f:
@@ -55,14 +58,67 @@ def get_authors():
 # http://stackoverflow.com/questions/19123623/python-runtime-library-dirs-doesnt-work-on-mac
 RE2_LIB_PATH = pjoin(RE2_SRC_PATH, "lib")
 
+# re2_ext = Extension( "re2._re2",
+#         sources=['re2/_re2.pyx'],
+#         language="c++",
+#         include_dirs=[pjoin(RE2_SRC_PATH, "include"), pjoin('re2', 'src')],
+#         libraries=["re2_dyn"],
+#         library_dirs=[RE2_LIB_PATH],
+#         # runtime_library_dirs=[RE2_LIB_PATH],
+#         # extra_objects=[pjoin(RE2_LIB_PATH, 'libre2_static.a')],
+#         extra_compile_args=['-Wno-unused-function'],
+#     )
+
+re2_cpp_src = [
+    pjoin("util", "arena.cc"),
+    pjoin("util", "hash.cc"),
+    pjoin("util", "rune.cc"),
+    pjoin("util", "stringpiece.cc"),
+    pjoin("util", "stringprintf.cc"),
+    pjoin("util","strutil.cc"),
+    pjoin("util","valgrind.cc"),
+    pjoin("re2", "bitstate.cc"),
+    pjoin("re2", "compile.cc"),
+    pjoin("re2", "dfa.cc"),
+    pjoin("re2", "filtered_re2.cc"),
+    pjoin("re2", "mimics_pcre.cc"),
+    pjoin("re2", "nfa.cc"),
+    pjoin("re2", "onepass.cc"),
+    pjoin("re2", "parse.cc"),
+    pjoin("re2", "perl_groups.cc"),
+    pjoin("re2", "prefilter.cc"),
+    pjoin("re2", "prefilter_tree.cc"),
+    pjoin("re2", "prog.cc"),
+    pjoin("re2", "re2.cc"),
+    pjoin("re2", "regexp.cc"),
+    pjoin("re2", "set.cc"),
+    pjoin("re2", "simplify.cc"),
+    pjoin("re2", "tostring.cc"),
+    pjoin("re2", "unicode_casefold.cc"),
+    pjoin("re2", "unicode_groups.cc")
+]
+
+for i, f in enumerate(re2_cpp_src):
+    re2_cpp_src[i] = pjoin(RE2_SRC_PATH, f)
+
+INSTALL_H_FILES = [ "filtered_re2.h",
+                    "re2.h",
+                    "set.h",
+                    "stringpiece.h",
+                    "variadic_function.h"]
+
+if os.path.exists(RE2_INSTALL_PATH):
+    shutil.rmtree(RE2_INSTALL_PATH)
+install_include_path = pjoin(RE2_INSTALL_PATH, "include", "re2")
+makedirs(install_include_path)
+for f in INSTALL_H_FILES:
+    shutil.copyfile(pjoin(RE2_SRC_PATH, "re2", f), 
+                    pjoin(install_include_path, f))
+
 re2_ext = Extension( "re2._re2",
-        sources=['re2/_re2.pyx'],
+        sources=re2_cpp_src+['re2/_re2.pyx'],
         language="c++",
-        include_dirs=[pjoin(RE2_SRC_PATH, "include"), pjoin('re2', 'src')],
-        libraries=["re2_dyn"],
-        library_dirs=[RE2_LIB_PATH],
-        # runtime_library_dirs=[RE2_LIB_PATH],
-        # extra_objects=[pjoin(RE2_LIB_PATH, 'libre2_static.a')],
+        include_dirs=['re2_cpp', pjoin('re2', 'src')],
         extra_compile_args=['-Wno-unused-function'],
     )
 

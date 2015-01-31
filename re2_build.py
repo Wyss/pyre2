@@ -29,7 +29,7 @@ def re2Clean():
 def re2Build():
     install_include_path = pjoin(RE2_INSTALL_PATH, "include", "re2")
     install_lib_path = pjoin(RE2_INSTALL_PATH, "lib")
-
+    # from http://stackoverflow.com/questions/10021428/macos-how-to-link-a-dynamic-library-with-a-relative-path-using-gcc-ld
     e_cmd = 'make -j4 LDFLAGS="-install_name %s/libre2_dyn.so" obj/so/libre2.so;' % (install_lib_path)    # only build the static libs
     # e_cmd = 'make -j4 obj/libre2.a;'    # only build the static libs
     re2build = subprocess.Popen([e_cmd],
