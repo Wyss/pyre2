@@ -16,7 +16,7 @@ INSTALL_H_FILES = [ "filtered_re2.h",
                     "set.h",
                     "stringpiece.h",
                     "variadic_function.h"]
-INSTALL_LIB_FILES = ["libre2.a"]
+INSTALL_LIB_FILES = ["libre2.so"]
 
 def re2Clean():
     re2clean = subprocess.Popen(['make clean'], shell=True, 
@@ -27,33 +27,32 @@ def re2Clean():
 
 
 def re2Build():
-    e_cmd = 'make -j4 obj/libre2.a;'    # only build the static libs
+    install_include_path = pjoin(RE2_INSTALL_PATH, "include", "re2")
+    install_lib_path = pjoin(RE2_INSTALL_PATH, "lib")
+
+    e_cmd = 'make -j4 LDFLAGS="-install_name %s/libre2_dyn.so" obj/so/libre2.so;' % (install_lib_path)    # only build the static libs
+    # e_cmd = 'make -j4 obj/libre2.a;'    # only build the static libs
     re2build = subprocess.Popen([e_cmd],
                                 shell=True, 
                                 cwd=RE2_SRC_PATH)
     re2build.wait()
     # copy files to install
-    install_include_path = pjoin(RE2_INSTALL_PATH, "include", "re2")
     if not os.path.exists(install_include_path):
         makedirs(install_include_path)
     for f in INSTALL_H_FILES:
         shutil.copyfile(pjoin(RE2_SRC_PATH, "re2", f), 
                         pjoin(install_include_path, f))
 
-    install_lib_path = pjoin(RE2_INSTALL_PATH, "lib")
     if not os.path.exists(install_lib_path):
         makedirs(install_lib_path)
     for f in INSTALL_LIB_FILES:
-        shutil.copyfile(pjoin(RE2_SRC_PATH, "obj", f), 
+        shutil.copyfile(pjoin(RE2_SRC_PATH, "obj", "so", f), 
                         pjoin(install_lib_path, f))
 
-    # RE2_LIB_PATH = pjoin(RE2_INSTALL_PATH, 'usr', 'local', 'lib')
-    RE2_LIB_PATH = pjoin(RE2_INSTALL_PATH, 'lib')
-    if not os.path.exists(RE2_LIB_PATH):
-        makedirs(RE2_LIB_PATH)
-    rename(pjoin(RE2_LIB_PATH, 'libre2.a'), 
-            pjoin(RE2_LIB_PATH, 'libre2_static.a'))
-
+    # rename(pjoin(install_lib_path, 'libre2.a'), 
+    #         pjoin(install_lib_path, 'libre2_static.a'))
+    rename(pjoin(install_lib_path, 'libre2.so'), 
+            pjoin(install_lib_path, 'libre2_dyn.so'))
 if __name__ == '__main__':
     re2Clean()
     re2Build()

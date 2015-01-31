@@ -22,7 +22,7 @@ IF IS_PY_THREE == 1:
     # end def
 ELSE:
     cdef inline int pystring_to_cstr(object o, char** c_str_ptr, Py_ssize_t *length) except -1:
-        if PyString_AsStringAndSize(o, c_str, length) == -1:
+        if PyString_AsStringAndSize(o, c_str_ptr, length) == -1:
             return -1
         return 0
     # end def
