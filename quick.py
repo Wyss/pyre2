@@ -31,5 +31,17 @@ def testre2():
 def testre():
     return re_regex.findall(genome)
 
-print(timeit.timeit("testre2()", setup="from __main__ import testre2", number=100))
-print(timeit.timeit("testre()", setup="from __main__ import testre", number=100))
+print(timeit.timeit("testre2()", setup="from __main__ import testre2", number=10))
+print(timeit.timeit("testre()", setup="from __main__ import testre", number=10))
+
+with open(fn, 'r') as fd:
+    genome_u = fd.read()
+
+search = "(?P<cupcake>c[cg]cg[ag]g)"
+
+re2_regex_u = re2.compile(search)
+def testre3():
+    return re2_regex_u.findall(genome_u)
+print(timeit.timeit("testre3()", setup="from __main__ import testre3", number=10))
+print(testre3()[:10])
+print(re2_regex_u.search(genome_u).groupdict())

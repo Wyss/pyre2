@@ -3,12 +3,11 @@ from libcpp.string cimport string as cpp_string
 #from libcpp.map cimport map as cpp_map
 from libcppmap cimport map as cpp_map    # until my PR is accepted
 
-cdef int MAGIC=7
-
 cdef extern from "Python.h":
     IF IS_PY_THREE == 1:
         cdef bint PyBytes_Check(object)
         cdef int PyBytes_AsStringAndSize(object, char**, Py_ssize_t*)
+        cdef char* PyUnicode_AsUTF8AndSize(object, Py_ssize_t*)
     ELSE:
         cdef bint PyString_Check(object)
         cdef int PyString_AsStringAndSize(object, char**, Py_ssize_t*)
@@ -16,9 +15,17 @@ cdef extern from "Python.h":
 
 IF IS_PY_THREE == 1:
     cdef inline int pystring_to_cstr(object o, char** c_str_ptr, Py_ssize_t *length) except -1:
-        if PyBytes_AsStringAndSize(o, c_str_ptr, length) == -1:
-            return -1
-        return 0
+        if PyBytes_Check(o):
+            if PyBytes_AsStringAndSize(o, c_str_ptr, length) == -1:
+                return -1
+            else:
+                return 0
+        else:
+            c_str_ptr[0] = PyUnicode_AsUTF8AndSize(o, length)
+            if c_str_ptr[0] == NULL:
+                return -1
+            else:
+                return 1
     # end def
 ELSE:
     cdef inline int pystring_to_cstr(object o, char** c_str_ptr, Py_ssize_t *length) except -1:

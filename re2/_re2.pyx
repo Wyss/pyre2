@@ -190,25 +190,43 @@ cdef class Match:
                 self._make_spans()
             return self._spans
 
-    def expand(self, bytes template):
+    def expand(self, object template):
         # TODO - This can be optimized to work a bit faster in C.
         # Expand a template with groups
-        items = template.split(b'\\')
-        for i, item in enumerate(items[1:]):
-            if item[0].isdigit():
-                # Number group
-                if item[0] == b'0'[0]:
-                    items[i + 1] = b'\x00' + item[1:]
+        if is_bytes(template):
+            items = template.split(b'\\')
+            for i, item in enumerate(items[1:]):
+                if item[0].isdigit():
+                    # Number group
+                    if item[0] == b'0'[0]:
+                        items[i + 1] = b'\x00' + item[1:]
+                    else:
+                        items[i + 1] = self.group(int(item[0])) + item[1:]
+                elif item[:2] == b'g<' and b'>' in item:
+                    # This is a named group
+                    name, rest = item[2:].split(b'>', 1)
+                    items[i + 1] = self.group(name) + rest
                 else:
-                    items[i + 1] = self.group(int(item[0])) + item[1:]
-            elif item[:2] == b'g<' and b'>' in item:
-                # This is a named group
-                name, rest = item[2:].split(b'>', 1)
-                items[i + 1] = self.group(name) + rest
-            else:
-                # This isn't a template at all
-                items[i + 1] = b'\\' + item
-        return b''.join(items)
+                    # This isn't a template at all
+                    items[i + 1] = b'\\' + item
+            return b''.join(items)
+        else:
+            items = template.split('\\')
+            for i, item in enumerate(items[1:]):
+                if item[0].isdigit():
+                    # Number group
+                    if item[0] == '0':
+                        items[i + 1] = '\x00' + item[1:]
+                    else:
+                        items[i + 1] = self.group(int(item[0])) + item[1:]
+                elif item[:2] == 'g<' and '>' in item:
+                    # This is a named group
+                    name, rest = item[2:].split('>', 1)
+                    items[i + 1] = self.group(name) + rest
+                else:
+                    # This isn't a template at all
+                    items[i + 1] = '\\' + item
+            return ''.join(items)
 
     def groupdict(self):
         #cdef _re2.stringintmapiterator it
@@ -223,10 +241,16 @@ cdef class Match:
 
         self._named_groups = result
         it = self.named_groups.const_begin()
-        while it != self.named_groups.const_end():
-            indexes[cpp_to_pystring(deref(it).first)] = deref(it).second
-            result[cpp_to_pystring(deref(it).first)] = self._groups[deref(it).second]
-            inc(it)
+        if self._pattern_object.is_encoded:
+            while it != self.named_groups.const_end():
+                indexes[cpp_to_pystring(deref(it).first).decode('utf-8')] = deref(it).second
+                result[cpp_to_pystring(deref(it).first).decode('utf-8')] = self._groups[deref(it).second].decode('utf-8')
+                inc(it)
+        else:
+            while it != self.named_groups.const_end():
+                indexes[cpp_to_pystring(deref(it).first)] = deref(it).second
+                result[cpp_to_pystring(deref(it).first)] = self._groups[deref(it).second]
+                inc(it)
 
         self._named_groups = result
         self._named_indexes = indexes
@@ -280,8 +304,19 @@ cdef class Pattern:
     cdef RE2* re_pattern
     cdef int ngroups
     cdef int _flags
+    cdef public bint is_encoded
     cdef public object pattern
     cdef object __weakref__
+    
+
+    #def __cinit__(self, original_pattern, 
+    #                    int ngroups, int flags, 
+    #                    bint is_encoded):
+    #    self.pattern = original_pattern
+    #    self.ngroups = ngroups
+    #    self._flags = flags
+    #    print("initialize encoded", is_encoded)
+    #    self.is_encoded = is_encoded
 
     property flags:
         def __get__(self):
@@ -294,7 +329,7 @@ cdef class Pattern:
     def __dealloc__(self):
         del self.re_pattern
 
-    cdef _search(self, bytes in_string, int pos, int endpos, re2_Anchor anchoring):
+    cdef _search(self, in_string, int pos, int endpos, re2_Anchor anchoring):
         """
         Scan through in_string looking for a match, and return a corresponding
         Match instance. Return None if no position in the in_string matches.
@@ -303,7 +338,6 @@ cdef class Pattern:
         cdef int result
         cdef char* cstring
         cdef int encoded = 0
-        #cdef StringPiece* sp
         cdef StringPiece sp
         cdef Match m = Match(self, self.ngroups + 1)
 
@@ -320,15 +354,7 @@ cdef class Pattern:
         if pos > size:
             return None
 
-        #sp = new StringPiece(cstring, size)
-        #try:
-        #    with nogil:
-        #        result = self.re_pattern.Match(sp[0], <int>pos, <int>size, 
-        #                                anchoring, m.matches, self.ngroups + 1)
-        #finally:
-        #    del sp
-
-        sp = StringPiece(cstring, size)
+        sp = StringPiece(cstring, size) # put on stack since a default constructor exists
         with nogil:
             result = self.re_pattern.Match(sp, <int>pos, <int>size, 
                                     anchoring, m.matches, self.ngroups + 1)
@@ -367,16 +393,14 @@ cdef class Pattern:
         sys.stdout.flush()
 
 
-    cdef _finditer(self, bytes in_string, int pos=0, int endpos=-1, int as_match=0):
+    cdef _finditer(self, in_string, int pos=0, int endpos=-1, int as_match=0):
         cdef Py_ssize_t size
         cdef int result
         cdef char* in_c_str
-        #cdef StringPiece* sp
         cdef StringPiece sp
         cdef Match m
         cdef list resultlist = []
         cdef int encoded = 0
-
         encoded = pystring_to_cstr(in_string, &in_c_str, &size)
         if encoded == -1:
             raise TypeError("expected string or buffer")
@@ -384,39 +408,6 @@ cdef class Pattern:
         if endpos != -1 and endpos < size:
             size = endpos
 
-        #sp = new StringPiece(in_c_str, size)
-        #try:
-        #    while True:
-        #        m = Match(self, self.ngroups + 1)
-        #        with nogil:
-        #            result = self.re_pattern.Match(sp[0], <int>pos, <int>size, 
-        #                            UNANCHORED, m.matches, self.ngroups + 1)
-        #        if result == 0:
-        #            break
-        #        m.named_groups = addressof(self.re_pattern.NamedCapturingGroups())
-        #        m.nmatches = self.ngroups + 1
-        #        m.match_string = in_string
-        #        m._pos = pos
-        #        if endpos == -1:
-        #            m._endpos = len(in_string)
-        #        else:
-        #            m._endpos = endpos
-        #        if as_match:
-        #            if self.ngroups > 1:
-        #                resultlist.append(m.groups(b""))
-        #            else:
-        #                resultlist.append(m.group(self.ngroups))
-        #        else:
-        #            resultlist.append(m)
-        #        if pos == size:
-        #            break
-        #        # offset the pos to move to the next point
-        #        if m.matches[0].length() == 0:
-        #            pos += 1
-        #        else:
-        #            pos = m.matches[0].data() - in_c_str + m.matches[0].length()
-        #finally:
-        #    del sp
         sp = StringPiece(in_c_str, size)
         while True:
             m = Match(self, self.ngroups + 1)
@@ -448,7 +439,10 @@ cdef class Pattern:
             else:
                 pos = m.matches[0].data() - in_c_str + m.matches[0].length()
         # end while
-        return resultlist
+        if self.is_encoded:
+            return [x.decode('utf-8') for x in resultlist]
+        else:
+            return resultlist
 
     def finditer(self, string, int pos=0, int endpos=-1):
         """
@@ -465,7 +459,7 @@ cdef class Pattern:
         """
         return self._finditer(string, pos, endpos, 1)
 
-    def split(self, bytes in_string, int maxsplit=0):
+    def split(self, in_string, int maxsplit=0):
         """
         split(in_string[, maxsplit = 0]) --> list
         Split a string by the occurances of the pattern.
@@ -531,9 +525,13 @@ cdef class Pattern:
         finally:
             delete_StringPiece_array(matches)
             del sp
-        return resultlist
 
-    def sub(self, repl, bytes in_string, int count=0):
+        if self.is_encoded:
+            return [x.decode('utf-8') for x in resultlist]
+        else:
+            return resultlist
+
+    def sub(self, repl, in_string, int count=0):
         """
         sub(repl, string[, count = 0]) --> newstring
         Return the string obtained by replacing the leftmost non-overlapping
@@ -541,7 +539,7 @@ cdef class Pattern:
         """
         return self.subn(repl, in_string, count)[0]
 
-    def subn(self, repl, bytes in_string, int count=0):
+    def subn(self, repl, in_string, int count=0):
         """
         subn(repl, in_string[, count = 0]) --> (newstring, number of subs)
         Return the tuple (new_string, number_of_subs_made) found by replacing
@@ -626,7 +624,10 @@ cdef class Pattern:
         finally:
             del fixed_repl
             del sp
-        return (result, total_replacements)
+        if self.is_encoded:
+            return (result.decode('utf8'), total_replacements)
+        else:
+            return (result, total_replacements)
     # end def
 
     def _subn_callback(self, callback, in_string, int count=0):
@@ -676,8 +677,11 @@ cdef class Pattern:
                     break
 
             resultlist.append(sp.data()[pos:])
-            #print("subn res", resultlist)
-            return (b''.join(resultlist), num_repl)
+
+            if self.is_encoded:
+                (b''.join(resultlist).decode('utf-8'), num_repl)
+            else:
+                return (b''.join(resultlist), num_repl)
         finally:
             del sp
 
@@ -692,7 +696,6 @@ def compile(pattern, int flags=0, int max_mem=8388608):
     if p is not None:
         return p
     p = _compile(pattern, flags, max_mem)
-
     if len(_cache) >= _MAXCACHE:
         _cache.clear()
     _cache[cachekey] = p
@@ -746,7 +749,6 @@ def prepare_pattern(pattern, int flags):
 
     while 1:
         this = source.get()
-        #print('this:', this)
         if this is None:
             break
         if flags & _X:
@@ -841,16 +843,32 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
     cdef Options opts
     cdef int error_code
     cdef int encoded = 0
+    cdef bint is_encoded
+    cdef bytes original_pattern
+    cdef Pattern pypattern
+    cdef RE2* re_pattern
 
     if isinstance(pattern, (Pattern, SREPattern)):
         if flags:
             raise ValueError('Cannot process flags argument with a compiled pattern')
         return pattern
 
-    cdef bytes original_pattern = pattern
+    IF IS_PY_THREE == 1:
+        if isinstance(pattern, str):
+            is_encoded = True
+            original_pattern = pattern.encode('utf8')
+        else:
+            original_pattern = pattern
+            is_encoded = False
+    ELSE:
+        if isinstance(pattern, unicode):
+            is_encoded = True
+            original_pattern = pattern.encode('utf8')
+        else:
+            original_pattern = pattern
+            is_encoded = False
     try:
-        pattern = prepare_pattern(original_pattern, flags)
-        #print("prepared", pattern)
+        ppattern = prepare_pattern(original_pattern, flags)
     except BackreferencesException:
         error_msg = "Backreferences not supported"
         if current_notification == <int>FALLBACK_EXCEPTION:
@@ -877,14 +895,13 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
     opts.set_encoding(EncodingUTF8)
 
     # We use this function to get the proper length of the string.
-    encoded = pystring_to_cstr(pattern, &pattern_cstr, &length)
+    encoded = pystring_to_cstr(ppattern, &pattern_cstr, &length)
     if encoded == -1:
         raise TypeError("first argument must be a string or compiled pattern")
 
-    #print("trying pattern", pattern)
     s = new StringPiece(pattern_cstr, length)
 
-    cdef RE2* re_pattern = new RE2(s[0], opts)
+    re_pattern = new RE2(s[0], opts)
 
     if not re_pattern.ok():
         # Something went wrong with the compilation.
@@ -904,11 +921,16 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
             warnings.warn("WARNING: Using re module. Reason: %s" % error_msg)
         return re.compile(original_pattern, flags)
 
-    cdef Pattern pypattern = Pattern()
+    #pypattern = Pattern(original_pattern, 
+    #                    re_pattern.NumberOfCapturingGroups(),
+    #                    flags,
+    #                    is_encoded)
+    pypattern = Pattern()
     pypattern.pattern = original_pattern
     pypattern.re_pattern = re_pattern
     pypattern.ngroups = re_pattern.NumberOfCapturingGroups()
     pypattern._flags = flags
+    pypattern.is_encoded = is_encoded
     del s
     return pypattern
 
@@ -942,7 +964,8 @@ def findall(pattern, in_string, int flags=0):
 
     Empty matches are included in the result.
     """
-    return compile(pattern, flags).findall(in_string)
+    p = compile(pattern, flags)
+    return p.findall(in_string)
 
 def split(pattern, in_string, int maxsplit=0):
     """

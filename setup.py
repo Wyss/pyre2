@@ -54,21 +54,6 @@ def get_authors():
         authors = [match.group(1) for match in author_re.finditer(authors_f.read())]
     return ', '.join(authors)
 
-# see:
-# http://stackoverflow.com/questions/19123623/python-runtime-library-dirs-doesnt-work-on-mac
-RE2_LIB_PATH = pjoin(RE2_SRC_PATH, "lib")
-
-# re2_ext = Extension( "re2._re2",
-#         sources=['re2/_re2.pyx'],
-#         language="c++",
-#         include_dirs=[pjoin(RE2_SRC_PATH, "include"), pjoin('re2', 'src')],
-#         libraries=["re2_dyn"],
-#         library_dirs=[RE2_LIB_PATH],
-#         # runtime_library_dirs=[RE2_LIB_PATH],
-#         # extra_objects=[pjoin(RE2_LIB_PATH, 'libre2_static.a')],
-#         extra_compile_args=['-Wno-unused-function'],
-#     )
-
 re2_cpp_src = [
     pjoin("util", "arena.cc"),
     pjoin("util", "hash.cc"),
@@ -121,16 +106,6 @@ re2_ext = Extension( "re2._re2",
         include_dirs=['re2_cpp', pjoin('re2', 'src')],
         extra_compile_args=['-Wno-unused-function'],
     )
-
-# re2_ext = Extension( "re2.tester",
-#         sources=['re2/tester.pyx'],
-#         language="c++",
-#         include_dirs=[pjoin(RE2_SRC_PATH, "include"), pjoin('re2', 'src')],
-#         libraries=["re2"],
-#         library_dirs=[pjoin(RE2_SRC_PATH, "lib")],
-#         runtime_library_dirs=[pjoin(RE2_SRC_PATH, "lib")],
-#         extra_compile_args=['-Wno-unused-function']
-#     )
 
 is_py_3 = int(sys.version_info[0] > 2)
 cython_ext_list = cythonize(re2_ext, compile_time_env={'IS_PY_THREE': is_py_3})
