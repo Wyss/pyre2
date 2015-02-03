@@ -3,6 +3,11 @@ from libcpp.string cimport string as cpp_string
 #from libcpp.map cimport map as cpp_map
 from libcppmap cimport map as cpp_map    # until my PR is accepted
 
+# Unicode on Python 2 is unsupported due to the requirement of a different
+# pattern for getting a char* pointer to a utf-8 encoded string since 
+# python 3 unicode strings keep the char* in a cache internally whereas 
+# python 2 unicode require a new object.  
+
 cdef extern from "Python.h":
     IF IS_PY_THREE == 1:
         cdef bint PyBytes_Check(object)
@@ -11,7 +16,6 @@ cdef extern from "Python.h":
     ELSE:
         cdef bint PyString_Check(object)
         cdef int PyString_AsStringAndSize(object, char**, Py_ssize_t*)
-
 
 IF IS_PY_THREE == 1:
     cdef inline int pystring_to_cstr(object o, char** c_str_ptr, Py_ssize_t *length) except -1:

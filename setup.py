@@ -96,9 +96,12 @@ if os.path.exists(RE2_INSTALL_PATH):
     shutil.rmtree(RE2_INSTALL_PATH)
 install_include_path = pjoin(RE2_INSTALL_PATH, "include", "re2")
 makedirs(install_include_path)
+re2_files = []  # unused for now, but to be used for pxd files
 for f in INSTALL_H_FILES:
     shutil.copyfile(pjoin(RE2_SRC_PATH, "re2", f), 
                     pjoin(install_include_path, f))
+    # re2_files.append('src', 're2_cpp', 'include', 're2', f)
+
 
 re2_ext = Extension( "re2._re2",
         sources=re2_cpp_src+['re2/_re2.pyx'],
@@ -106,6 +109,7 @@ re2_ext = Extension( "re2._re2",
         include_dirs=['re2_cpp', pjoin('re2', 'src')],
         extra_compile_args=['-Wno-unused-function'],
     )
+
 
 is_py_3 = int(sys.version_info[0] > 2)
 cython_ext_list = cythonize(re2_ext, compile_time_env={'IS_PY_THREE': is_py_3})
@@ -118,6 +122,7 @@ setup(
     version="0.2.20",
     description=DESCRIPTION,
     long_description=get_long_description(),
+    package_data={'re2': re2_files},
     license=LICENSE,
     maintainer_email = EMAIL,
     url = "http://github.com/Wyss/pyre2/",
