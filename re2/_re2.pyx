@@ -69,8 +69,9 @@ cdef class Match:
     cdef int _pos
     cdef int _endpos
     cdef object match_string
+    cdef char* match_c_str
     cdef object _pattern_object
-    cdef tuple _groups
+    cdef list _groups
     cdef tuple _spans
     cdef dict _named_groups
     cdef dict _named_indexes
@@ -134,22 +135,32 @@ cdef class Match:
                 groups.append(self.matches[i].data()[:self.matches[i].length()])
             # end else
         # end for i
-        self._groups = tuple(groups)
+        self._groups = groups
 
     def groups(self, default=None):
         self.init_groups()
         if default is not None:
-            return tuple([g.decode('utf-8') or default.decode('utf-8') for g in self._groups[1:]])
-        if self._pattern_object.is_encoded:
-            return tuple([x.decode('utf-8') for x in self._groups[1:]])
+            if self._pattern_object.is_encoded:
+                outlist = []
+                for g in self._groups[1:]:
+                    if g is None:
+                        outlist.append(default)
+                    else:
+                        outlist.append(g.decode('utf-8') )
+                return tuple(outlist)
+            else:
+                return tuple([g or default for g in self._groups[1:]])
         else:
-            return self._groups[1:]
+            if self._pattern_object.is_encoded:
+                return tuple([g if g is None else g.decode('utf-8') for g in self._groups[1:]])
+            else:
+                return tuple(self._groups[1:])
 
     def groups_b(self, default=None):
         self.init_groups()
         if default is not None:
             return tuple([g or default for g in self._groups[1:]])
-        return self._groups[1:]
+        return tuple(self._groups[1:])
 
     def group(self, *args):
         if len(args) > 1:
@@ -172,7 +183,8 @@ cdef class Match:
             raise IndexError("no such group")
 
         if self._pattern_object.is_encoded:
-            return self._groups[idx].decode('utf-8')
+            val = self._groups[idx]
+            return None if val is None else val.decode('utf-8')
         else:
             return self._groups[idx]
 
@@ -204,9 +216,8 @@ cdef class Match:
             return
 
         cdef int start, end
-        cdef char * s = self.match_string
-        cdef StringPiece * piece
-
+        cdef char* s = self.match_c_str
+        cdef StringPiece* piece
         spans = []
         for i in range(self.nmatches):
             if self.matches[i].data() == NULL:
@@ -270,7 +281,9 @@ cdef class Match:
         cdef cpp_map[cpp_string, int].const_iterator it
         cdef dict result = {}
         cdef dict indexes = {}
-
+        cdef int idx
+        cdef object key
+        cdef object val
         self.init_groups()
 
         if self._named_groups:
@@ -280,16 +293,18 @@ cdef class Match:
         it = self.named_groups.const_begin()
         if self._pattern_object.is_encoded:
             while it != self.named_groups.const_end():
-                indexes[cpp_to_pystring(deref(it).first).decode('utf-8')] = \
-                                                                deref(it).second
-                result[cpp_to_pystring(deref(it).first).decode('utf-8')] = \
-                                self._groups[deref(it).second].decode('utf-8')
+                idx = deref(it).second
+                key = cpp_to_pystring(deref(it).first).decode('utf-8')
+                indexes[key] = idx
+                val = self._groups[idx]                                              
+                result[key] = None if val is None else val.decode('utf-8')
                 inc(it)
         else:
             while it != self.named_groups.const_end():
-                indexes[cpp_to_pystring(deref(it).first)] = deref(it).second
-                result[cpp_to_pystring(deref(it).first)] = \
-                                                self._groups[deref(it).second]
+                idx = deref(it).second
+                key = cpp_to_pystring(deref(it).first)
+                indexes[key] = idx
+                result[key] = self._groups[idx]
                 inc(it)
 
         self._named_groups = result
@@ -405,6 +420,7 @@ cdef class Pattern:
         m.named_groups = addressof(self.re_pattern.NamedCapturingGroups())
         m.nmatches = self.ngroups + 1
         m.match_string = in_string
+        m.match_c_str = input_c_str
         m._pos = pos
         if endpos == -1:
             m._endpos = len(in_string)
@@ -469,6 +485,7 @@ cdef class Pattern:
             m.named_groups = addressof(self.re_pattern.NamedCapturingGroups())
             m.nmatches = self.ngroups + 1
             m.match_string = in_string
+            m.match_c_str = input_c_str
             m._pos = pos
             if endpos == -1:
                 m._endpos = len(in_string)
@@ -490,7 +507,7 @@ cdef class Pattern:
                 pos = m.matches[0].data() - input_c_str + m.matches[0].length()
         # end while
         if self.is_encoded:
-            return [x.decode('utf-8') for x in resultlist]
+            return [None if x is None else x.decode('utf-8') for x in resultlist]
         else:
             return resultlist
 
@@ -585,7 +602,7 @@ cdef class Pattern:
             del sp
 
         if self.is_encoded:
-            return [x.decode('utf-8') for x in resultlist]
+            return [None if x is None else x.decode('utf-8') for x in resultlist]
         else:
             return resultlist
 
@@ -639,7 +656,7 @@ cdef class Pattern:
         cdef int c = 0
         while s < end:
             c = s[0]
-            if (c == '\\'):
+            if c == '\\':
                 s += 1
                 if s == end:
                     raise RegexError("Invalid rewrite pattern")
@@ -751,7 +768,12 @@ cdef class Pattern:
                 m.named_groups = addressof(self.re_pattern.NamedCapturingGroups())
                 m.nmatches = self.ngroups + 1
                 m.match_string = in_string
-                resultlist.append(callback(m) or b'')
+                m.match_c_str = input_c_str
+
+                if self.is_encoded:
+                    resultlist.append(callback(m).encode('utf-8') or b'')
+                else:
+                    resultlist.append(callback(m) or b'')
 
                 num_repl += 1
                 if count and num_repl >= count:
@@ -924,7 +946,7 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
     cdef int error_code
     cdef int encoded = 0
     cdef bint is_encoded
-    cdef bytes original_pattern
+    cdef bytes bytes_pattern
     cdef Pattern pypattern
     cdef RE2* re_pattern
 
@@ -936,19 +958,19 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
     IF IS_PY_THREE == 1:
         if isinstance(pattern, str):
             is_encoded = True
-            original_pattern = pattern.encode('utf8')
+            bytes_pattern = pattern.encode('utf8')
         else:
-            original_pattern = pattern
+            bytes_pattern = pattern
             is_encoded = False
     ELSE:
         if isinstance(pattern, unicode):
             is_encoded = True
-            original_pattern = pattern.encode('utf8')
+            bytes_pattern = pattern.encode('utf8')
         else:
-            original_pattern = pattern
+            bytes_pattern = pattern
             is_encoded = False
     try:
-        ppattern = prepare_pattern(original_pattern, flags)
+        ppattern = prepare_pattern(bytes_pattern, flags)
     except BackreferencesException:
         error_msg = "Backreferences not supported"
         if current_notification == <int>FALLBACK_EXCEPTION:
@@ -956,7 +978,7 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
             raise RegexError(error_msg)
         elif current_notification == <int>FALLBACK_WARNING:
             warnings.warn("WARNING: Using re module. Reason: %s" % error_msg)
-        return re.compile(original_pattern, flags)
+        return re.compile(pattern, flags)
     except CharClassProblemException:
         error_msg = "\W and \S not supported inside character classes"
         if current_notification == <int>FALLBACK_EXCEPTION:
@@ -964,7 +986,7 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
             raise RegexError(error_msg)
         elif current_notification == <int>FALLBACK_WARNING:
             warnings.warn("WARNING: Using re module. Reason: %s" % error_msg)
-        return re.compile(original_pattern, flags)
+        return re.compile(pattern, flags)
 
     # Set the options given the flags above.
     if flags & _I:
@@ -999,14 +1021,10 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
             raise RegexError(error_msg)
         elif current_notification == <int>FALLBACK_WARNING:
             warnings.warn("WARNING: Using re module. Reason: %s" % error_msg)
-        return re.compile(original_pattern, flags)
+        return re.compile(pattern, flags)
 
-    #pypattern = Pattern(original_pattern, 
-    #                    re_pattern.NumberOfCapturingGroups(),
-    #                    flags,
-    #                    is_encoded)
     pypattern = Pattern()
-    pypattern.pattern = original_pattern
+    pypattern.pattern = bytes_pattern
     pypattern.re_pattern = re_pattern
     pypattern.ngroups = re_pattern.NumberOfCapturingGroups()
     pypattern._flags = flags
@@ -1044,8 +1062,7 @@ def findall(pattern, in_string, int flags=0):
 
     Empty matches are included in the result.
     """
-    p = compile(pattern, flags)
-    return p.findall(in_string)
+    return compile(pattern, flags).findall(in_string)
 
 def split(pattern, in_string, int maxsplit=0):
     """

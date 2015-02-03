@@ -16,6 +16,9 @@ print(re2.sub(b'(.)', re2.escape(s), b'x'))
 print(re2.sub(b'(.)', re2.escape(s), b'x') == s)
 
 #begin unicode
+def bump_num(matchobj):
+    int_value = int(matchobj.group_b(0))
+    return str(int_value + 1)
 
 print(re2.sub('\\d+', bump_num, '08.2 -2 23x99y'))
 print('9.3 -3 24x100y')

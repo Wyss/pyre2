@@ -47,7 +47,10 @@ cdef inline bytes _bytes(s):
         else:
             return s
     ELSE:
-        return s
+        if isinstance(s, unicode):
+            return (<str>s).encode('utf8')
+        else:
+            return s
 
 cdef inline bint is_bytes(s):
     IF IS_PY_THREE == 1:
