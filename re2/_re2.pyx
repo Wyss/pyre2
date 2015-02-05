@@ -4,7 +4,8 @@ import sys
 import re
 from cython.operator cimport preincrement as inc, dereference as deref
 import warnings
-
+from cpython.tuple cimport PyTuple_Size
+from cpython.list cimport PyList_Size
 I = re.I
 IGNORECASE = re.IGNORECASE
 M = re.M
@@ -50,7 +51,7 @@ class RegexError(re.error):
     """
     pass
 
-error = RegexError
+error = re.error
 
 cdef int _I = I, _M = M, _S = S, _U = U, _X = X, _L = L
 
@@ -458,7 +459,11 @@ cdef class Pattern:
         cdef Match m
         cdef list resultlist = []
         cdef int encoded = 0
-        
+        cdef Py_ssize_t tuple_len, resultlist_size
+        cdef int i, j
+        cdef object temp_in, temp_out
+        cdef list reslist_out
+
         IF IS_PY_THREE == 0:
             if self.is_encoded:
                 in_string_b = in_string.encode('utf-8')
@@ -507,7 +512,29 @@ cdef class Pattern:
                 pos = m.matches[0].data() - input_c_str + m.matches[0].length()
         # end while
         if self.is_encoded:
-            return [None if x is None else x.decode('utf-8') for x in resultlist]
+            try:
+                resultlist_size = PyList_Size(resultlist)
+                if resultlist_size > 0:
+                    r0 = resultlist[0]
+                    if isinstance(r0, tuple):
+                        reslist_out = [None]*resultlist_size
+                        tuple_len = PyTuple_Size(r0)
+                        for i in range(resultlist_size):
+                            temp_in = resultlist[i]
+                            temp_out = [None]*tuple_len
+                            for j in range(tuple_len):
+                                temp_out[j] = temp_in[j].decode('utf-8')
+                            reslist_out[i] = tuple(temp_out)
+                        return reslist_out
+                    elif isinstance(r0, Match):
+                        return resultlist
+                    else:
+                        return [None if x is None else x.decode('utf-8') for x in resultlist]
+                else:
+                    return resultlist
+            except:
+                print("doh", x)
+                raise
         else:
             return resultlist
 
@@ -901,35 +928,39 @@ def prepare_pattern(pattern, int flags):
                 else:
                     new_pattern.append(this)
         elif this[0] == b'\\'[0]:
-            if this[1] in b'89':
-                raise BackreferencesException()
-            elif this[1] in b'1234567':
-                if source.next and source.next in b'1234567':
-                    this += source.get()
+            if len(this) == 1:
+                new_pattern.append(this)
+            else:
+                if this[1] in b'89':
+                    raise BackreferencesException()
+                elif this[1] in b'1234567':
                     if source.next and source.next in b'1234567':
-                        # all clear, this is an octal escape
-                        new_pattern.append(this)
+                        this += source.get()
+                        if source.next and source.next in b'1234567':
+                            # all clear, this is an octal escape
+                            new_pattern.append(this)
+                        else:
+                            raise BackreferencesException()
                     else:
                         raise BackreferencesException()
-                else:
-                    raise BackreferencesException()
-            elif flags & _U:
-                if this[1] == b'd'[0]:
-                    new_pattern.append(b'\\p{Nd}')
-                elif this[1] == b'w'[0]:
-                    new_pattern.append(b'[_\\p{L}\\p{Nd}]')
-                elif this[1] == b's'[0]:
-                    new_pattern.append(b'[\\s\\p{Z}]')
-                elif this[1] == b'D'[0]:
-                    new_pattern.append(b'[^\\p{Nd}]')
-                elif this[1] == b'W'[0]:
-                    new_pattern.append(b'[^_\\p{L}\\p{Nd}]')
-                elif this[1] == b'S'[0]:
-                    new_pattern.append(b'[^\\s\\p{Z}]')
+                elif flags & _U:
+                    if this[1] == b'd'[0]:
+                        new_pattern.append(b'\\p{Nd}')
+                    elif this[1] == b'w'[0]:
+                        new_pattern.append(b'[_\\p{L}\\p{Nd}]')
+                    elif this[1] == b's'[0]:
+                        new_pattern.append(b'[\\s\\p{Z}]')
+                    elif this[1] == b'D'[0]:
+                        new_pattern.append(b'[^\\p{Nd}]')
+                    elif this[1] == b'W'[0]:
+                        new_pattern.append(b'[^_\\p{L}\\p{Nd}]')
+                    elif this[1] == b'S'[0]:
+                        new_pattern.append(b'[^\\s\\p{Z}]')
+                    else:
+                        new_pattern.append(this)
                 else:
                     new_pattern.append(this)
-            else:
-                new_pattern.append(this)
+
 
     return b''.join(new_pattern)
 

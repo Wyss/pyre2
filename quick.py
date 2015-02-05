@@ -48,8 +48,8 @@ print(re2_regex.search(genome).groupdict())
 search = b"c[cg]cg[ag]g"
 re2_regex = re2.compile(search)
 # print(re2_regex.findall(genome))
-print("bytes re2:", timeit.timeit("testre2()", setup="from __main__ import testre2", number=10))
-print("bytes re:", timeit.timeit("testre()", setup="from __main__ import testre", number=10))
+print("bytes re2:", timeit.timeit("testre2()", setup="from __main__ import testre2", number=1))
+print("bytes re:", timeit.timeit("testre()", setup="from __main__ import testre", number=1))
 
 with open(fn, 'r') as fd:
     genome_u = fd.read()
@@ -59,6 +59,6 @@ search = "(?P<cupcake>c[cg]cg[ag]g)"
 re2_regex_u = re2.compile(search)
 def testre3():
     return re2_regex_u.findall(genome_u)
-print("unicode re2:", timeit.timeit("testre3()", setup="from __main__ import testre3", number=10))
+print("unicode re2:", timeit.timeit("testre3()", setup="from __main__ import testre3", number=1))
 # print(testre3()[:10])
 print(re2_regex_u.search(genome_u).groupdict())

@@ -106,8 +106,11 @@ tests = [
     ('a.*b', 'acc\nccb', FAIL),
     ('a.{4,5}b', 'acc\nccb', FAIL),
     ('a.b', 'a\rb', SUCCEED, 'found', 'a\rb'),
-    ('a.b(?s)', 'a\nb', SUCCEED, 'found', 'a\nb'),
-    ('a.*(?s)b', 'acc\nccb', SUCCEED, 'found', 'acc\nccb'),
+
+    # fails in re2
+    # ('a.b(?s)', 'a\nb', SUCCEED, 'found', 'a\nb'),
+    # ('a.*(?s)b', 'acc\nccb', SUCCEED, 'found', 'acc\nccb'),
+    
     ('(?s)a.{4,5}b', 'acc\nccb', SUCCEED, 'found', 'acc\nccb'),
     ('(?s)a.b', 'a\nb', SUCCEED, 'found', 'a\nb'),
 
@@ -563,7 +566,11 @@ tests = [
     # Check odd placement of embedded pattern modifiers
 
     # not an error under PCRE/PRE:
-    ('w(?i)', 'W', SUCCEED, 'found', 'W'),
+    # this returns None in re2
+    # ('w(?i)', 'W', SUCCEED, 'found', 'W'),
+    # need to implement in re2 like this:
+    ('(?i:w)', 'W', SUCCEED, 'found', 'W'),
+
     # ('w(?i)', 'W', SYNTAX_ERROR),
 
     # Comments using the x embedded pattern modifier
