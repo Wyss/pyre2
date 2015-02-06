@@ -36,8 +36,8 @@ def set_fallback_notification(level):
     """
     Set the fallback notification to a level; one of:
         FALLBACK_QUIETLY
-	FALLBACK_WARNING
-	FALLBACK_EXCEPTION
+        FALLBACK_WARNING
+        FALLBACK_EXCEPTION
     """
     global current_notification
     level = int(level)
@@ -77,17 +77,17 @@ cdef int uniPairToCPair(const char* input_c_str,
     while c_pos < in_size:
         c = <unsigned char>input_c_str[c_pos]
         if c < 0x80:
-            c_pos += 1 #inc(c_pos)
-            u_pos += 1 #inc(u_pos)
+            inc(c_pos)
+            inc(u_pos)
         elif c < 0xe0:
             c_pos += 2
-            u_pos += 1 #inc(u_pos)
+            inc(u_pos)
         elif c < 0xf0:
             c_pos += 3
-            u_pos += 1 #inc(u_pos)
+            inc(u_pos)
         else:
             c_pos += 4
-            u_pos += 1 #inc(u_pos)
+            inc(u_pos)
         if u_pos == u_idx:
             if u_idx == u_start:
                 c_start[0] = c_pos
@@ -107,6 +107,8 @@ cdef class Match:
     cdef int _pos
     cdef int _endpos
     cdef object match_string
+    IF IS_PY_THREE == 0:
+        cdef object match_string_b
     cdef char* match_c_str
     cdef Py_ssize_t match_c_str_len
     cdef object _pattern_object
@@ -252,8 +254,8 @@ cdef class Match:
 
     cdef list _convert_positions(self, positions):
         cdef char* s = self.match_c_str
-        cdef int cpos = 0
-        cdef int upos = 0
+        cdef int c_pos = 0
+        cdef int u_pos = 0
         cdef Py_ssize_t size = self.match_c_str_len
         cdef unsigned char c 
         cdef int num_positions, i
@@ -263,38 +265,38 @@ cdef class Match:
         num_positions = len(positions)
         if positions[i] == -1:
             new_positions.append(-1)
-            i += 1 #inc(i)
+            inc(i)
             if i == num_positions:
                 return new_positions
         if positions[i] == 0:
             new_positions.append(0)
-            i += 1 #inc(i)
+            inc(i)
             if i == num_positions:
                 return new_positions
 
-        while cpos < size:
-            c = <unsigned char>s[cpos]
+        while c_pos < size:
+            c = <unsigned char>s[c_pos]
             if c < 0x80:
-                cpos += 1 #inc(cpos)
-                upos += 1 #inc(upos)
+                inc(c_pos)
+                inc(u_pos)
             elif c < 0xe0:
-                cpos += 2
-                upos += 1 #inc(upos)
+                c_pos += 2
+                inc(u_pos)
             elif c < 0xf0:
-                cpos += 3
-                upos += 1 #inc(upos)
+                c_pos += 3
+                inc(u_pos)
             else:
-                cpos += 4
-                upos += 1 #inc(upos)
+                c_pos += 4
+                inc(u_pos)
                 # wide unicode chars get 2 unichars when python is compiled with --enable-unicode=ucs2
                 # TODO: verify this
                 emit_ifndef_py_unicode_wide()
-                upos += 1 #inc(upos)
+                inc(u_pos)
                 emit_endif()
 
-            if positions[i] == cpos:
-                new_positions.append(upos)
-                i += 1 #inc(i)
+            if positions[i] == c_pos:
+                new_positions.append(u_pos)
+                inc(i)
                 if i == num_positions:
                     return new_positions
         return new_positions
@@ -329,7 +331,7 @@ cdef class Match:
                 end = start + piece.length()
                 spans.append((start, end))
 
-        if self._pattern_object.is_encoded:
+        if self._pattern_object.is_unicode_flag:
             spans = self._convert_spans(spans)
 
         self._spans = tuple(spans)
@@ -343,6 +345,7 @@ cdef class Match:
     def expand(self, object template):
         # TODO - This can be optimized to work a bit faster in C.
         # Expand a template with groups
+        cdef int i
         if is_bytes(template):
             items = template.split(b'\\')
             for i, item in enumerate(items[1:]):
@@ -464,6 +467,7 @@ cdef class Pattern:
     cdef int ngroups
     cdef int _flags
     cdef public bint is_encoded
+    cdef public bint is_unicode_flag
     cdef public object pattern
     cdef object __weakref__
 
@@ -509,7 +513,7 @@ cdef class Pattern:
         if pos < 0 or pos > endpos or endpos > input_size:
             return None
 
-        if self.is_encoded:
+        if self.is_unicode_flag:
             uniPairToCPair(input_c_str, input_size, 
                             pos, endpos, 
                             &re2_startpos, &re2_endpos)
@@ -535,6 +539,8 @@ cdef class Pattern:
             m._endpos = len(in_string)
         else:
             m._endpos = endpos
+        IF IS_PY_THREE == 0:
+            m.match_string_b = in_string_b
         return m
     # end cdef
 
@@ -590,7 +596,7 @@ cdef class Pattern:
         if pos < 0 or pos > endpos or endpos > input_size:
             return None
 
-        if self.is_encoded:
+        if self.is_unicode_flag:
             uniPairToCPair(input_c_str, input_size, 
                             pos, endpos, 
                             &re2_startpos, &re2_endpos)
@@ -611,6 +617,8 @@ cdef class Pattern:
             m.match_string = in_string
             m.match_c_str = input_c_str
             m.match_c_str_len = input_size
+            IF IS_PY_THREE == 0:
+                m.match_string_b = in_string_b
 
             # storing the c_str position and NOT the unicode
             m._pos = re2_startpos
@@ -690,13 +698,15 @@ cdef class Pattern:
         cdef char* input_c_str
         cdef StringPiece* sp
         cdef StringPiece* matches
-        cdef Match m
+        #cdef Match m
         cdef list resultlist = []
         cdef int encoded = 0
 
         if maxsplit < 0:
             maxsplit = 0
 
+        # does not return a Match object so no need to keep track of
+        # references to in_string or in_string_b
         IF IS_PY_THREE == 0:
             if self.is_encoded:
                 in_string_b = in_string.encode('utf-8')
@@ -919,7 +929,8 @@ cdef class Pattern:
                 m.match_string = in_string
                 m.match_c_str = input_c_str
                 m.match_c_str_len = input_size
-
+                IF IS_PY_THREE == 0:
+                    m.match_string_b = in_string_b
                 if self.is_encoded:
                     resultlist.append(callback(m).encode('utf-8') or b'')
                 else:
@@ -1182,6 +1193,7 @@ def _compile(pattern, int flags=0, int max_mem=8388608):
     pypattern.re_pattern = re_pattern
     pypattern.ngroups = re_pattern.NumberOfCapturingGroups()
     pypattern._flags = flags
+    pypattern.is_unicode_flag = flags & _U
     pypattern.is_encoded = is_encoded
     del s
     return pypattern
