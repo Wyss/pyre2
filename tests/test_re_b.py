@@ -1,12 +1,12 @@
-# from test.test_support import verbose, run_unittest, import_module
-from test import test_support
 from re import Scanner
+from re import error as re_error
 import sys, os, traceback
 from weakref import proxy
 
 # For package imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import re2 as re
+import six
 
 # Misc tests from Tim Peters' re.doc
 
@@ -696,133 +696,9 @@ class ReTests(unittest.TestCase):
 #         self.assertRaises(TypeError, re.finditer, "a", {})
 #         self.assertRaises(OverflowError, _sre.compile, "abc", 0, [long_overflow])
 
-# def run_re_tests():
-#     from re_tests import benchmarks, tests, SUCCEED, FAIL, SYNTAX_ERROR
-#     if verbose:
-#         print('Running re_tests test suite')
-#     else:
-#         # To save time, only run the first and last 10 tests
-#         #tests = tests[:10] + tests[-10:]
-#         pass
-
-#     for t in tests:
-#         sys.stdout.flush()
-#         pattern = s = outcome = repl = expected = None
-#         if len(t) == 5:
-#             pattern, s, outcome, repl, expected = t
-#         elif len(t) == 3:
-#             pattern, s, outcome = t
-#         else:
-#             raise ValueError, ('Test tuples should have 3 or 5 fields', t)
-
-#         try:
-#             obj = re.compile(pattern)
-#         except re.error:
-#             if outcome == SYNTAX_ERROR: pass  # Expected a syntax error
-#             else:
-#                 print '=== Syntax error:', t
-#         except KeyboardInterrupt: raise KeyboardInterrupt
-#         except:
-#             print '*** Unexpected error ***', t
-#             if verbose:
-#                 traceback.print_exc(file=sys.stdout)
-#         else:
-#             try:
-#                 result = obj.search(s)
-#             except re.error, msg:
-#                 print '=== Unexpected exception', t, repr(msg)
-#             if outcome == SYNTAX_ERROR:
-#                 # This should have been a syntax error; forget it.
-#                 pass
-#             elif outcome == FAIL:
-#                 if result is None: pass   # No match, as expected
-#                 else: print '=== Succeeded incorrectly', t
-#             elif outcome == SUCCEED:
-#                 if result is not None:
-#                     # Matched, as expected, so now we compute the
-#                     # result string and compare it to our expected result.
-#                     start, end = result.span(0)
-#                     vardict={'found': result.group(0),
-#                              'groups': result.group(),
-#                              'flags': result.re.flags}
-#                     for i in range(1, 100):
-#                         try:
-#                             gi = result.group(i)
-#                             # Special hack because else the string concat fails:
-#                             if gi is None:
-#                                 gi = "None"
-#                         except IndexError:
-#                             gi = "Error"
-#                         vardict['g%d' % i] = gi
-#                     for i in result.re.groupindex.keys():
-#                         try:
-#                             gi = result.group(i)
-#                             if gi is None:
-#                                 gi = "None"
-#                         except IndexError:
-#                             gi = "Error"
-#                         vardict[i] = gi
-#                     repl = eval(repl, vardict)
-#                     if repl != expected:
-#                         print '=== grouping error', t,
-#                         print repr(repl) + ' should be ' + repr(expected)
-#                 else:
-#                     print '=== Failed incorrectly', t
-
-#                 # Try the match on a unicode string, and check that it
-#                 # still succeeds.
-#                 try:
-#                     result = obj.search(unicode(s, "latin-1"))
-#                     if result is None:
-#                         print '=== Fails on unicode match', t
-#                 except NameError:
-#                     continue # 1.5.2
-#                 except TypeError:
-#                     continue # unicode test case
-
-#                 # Try the match on a unicode pattern, and check that it
-#                 # still succeeds.
-#                 obj=re.compile(unicode(pattern, "latin-1"))
-#                 result = obj.search(s)
-#                 if result is None:
-#                     print '=== Fails on unicode pattern match', t
-
-#                 # Try the match with the search area limited to the extent
-#                 # of the match and see if it still succeeds.  \B will
-#                 # break (because it won't match at the end or start of a
-#                 # string), so we'll ignore patterns that feature it.
-
-#                 if pattern[:2] != '\\B' and pattern[-2:] != '\\B' \
-#                                and result is not None:
-#                     obj = re.compile(pattern)
-#                     result = obj.search(s, result.start(0), result.end(0) + 1)
-#                     if result is None:
-#                         print '=== Failed on range-limited match', t
-
-#                 # Try the match with IGNORECASE enabled, and check that it
-#                 # still succeeds.
-#                 obj = re.compile(pattern, re.IGNORECASE)
-#                 result = obj.search(s)
-#                 if result is None:
-#                     print '=== Fails on case-insensitive match', t
-
-#                 # Try the match with LOCALE enabled, and check that it
-#                 # still succeeds.
-#                 obj = re.compile(pattern, re.LOCALE)
-#                 result = obj.search(s)
-#                 if result is None:
-#                     print('=== Fails on locale-sensitive match', t)
-
-#                 # Try the match with UNICODE locale enabled, and check
-#                 # that it still succeeds.
-#                 obj = re.compile(pattern, re.UNICODE)
-#                 result = obj.search(s)
-#                 if result is None:
-#                     print('=== Fails on unicode-sensitive match', t)
 
 def test_main():
-    test_support.support.run_unittest(ReTests)
-    # run_re_tests()
+    unittest.main(verbosity=2)
 
 if __name__ == "__main__":
     test_main()

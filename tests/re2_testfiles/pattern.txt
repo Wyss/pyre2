@@ -6,4 +6,4 @@ pattern tests
 We should be able to get back what we put in.
 
     >>> re2.compile("(foo|b[a]r?)").pattern
-    '(foo|b[a]r?)'
+    b'(foo|b[a]r?)'

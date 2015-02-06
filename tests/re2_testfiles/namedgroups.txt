@@ -16,7 +16,7 @@ Testing some aspects of named groups
 
 Make sure positions are converted properly for unicode 
 
-    >>> m = re.match(r"(?P<first_name>\w+) (?P<last_name>\w+)", u'\u05d9\u05e9\u05e8\u05d0\u05dc \u05e6\u05d3\u05d5\u05e7', re.UNICODE)
+    >>> m = re.match(r"(?P<first_name>\w+) (?P<last_name>\w+)", '\u05d9\u05e9\u05e8\u05d0\u05dc \u05e6\u05d3\u05d5\u05e7', re.UNICODE)
     >>> m.start("first_name")
     0
     >>> m.start("last_name")

@@ -12,7 +12,10 @@ These are simple tests of the ``search`` function
     >>> len(re.search('(?:a{1000})?a{999}', input).group())
     999
 
-    >>> re.search(r'\n#hdr-editions(.*?)\n', open("cnn_homepage.dat").read()).groups()
+    >>> import os
+    >>> mpath = os.path.abspath(os.getcwd())
+    >>> mpath = os.path.join(mpath, 'tests', 're2_testfiles', 'cnn_homepage.dat')
+    >>> re.search(r'\n#hdr-editions(.*?)\n', open(mpath).read()).groups()
     (' a { text-decoration:none; }',)
 
 Verify some sanity checks

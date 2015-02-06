@@ -1,4 +1,3 @@
-# from test.test_support import verbose, run_unittest, import_module
 from re import Scanner
 from re import error as re_error
 import sys, os, traceback

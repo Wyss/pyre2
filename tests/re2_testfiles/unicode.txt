@@ -1,0 +1,69 @@
+Here are some tests to make sure that utf-8 works
+=================================================
+
+    >>> import re2 as re
+    >>> a = '\u6211\u5f88\u597d'
+    >>> c = re.compile(a[0])
+    >>> c.search(a).group()
+    '\u6211'
+
+Test unicode stickyness
+
+    >>> re.sub(r'x', 'y', 'x')
+    'y'
+    >>> re.sub(r'x', 'y', u'x')
+    'y'
+    >>> re.sub('x', 'y', 'x')
+    'y'
+    >>> re.findall('.', 'x')
+    ['x']
+    >>> re.findall('.', 'x')
+    ['x']
+    >>> re.split(',', '1,2,3')
+    ['1', '2', '3']
+    >>> re.split(r',', '1,2,3')
+    ['1', '2', '3']
+    >>> re.search(u'(\\d)', '1').group(1)
+    '1'
+    >>> re.search(u'(\\d)', '1').group(1)
+    '1'
+
+Test unicode character groups
+
+    >>> re.search(r'\d', '\u0661', re.UNICODE).group(0)
+    '\u0661'
+    >>> int(re.search(r'\d', '\u0661', re.UNICODE).group(0))
+    1
+    >>> re.search(r'\w', '\u0401')
+    >>> re.search(r'\w', '\u0401', re.UNICODE).group(0)
+    '\u0401'
+    >>> re.search(r'\s', '\u1680', re.UNICODE).group(0)
+    '\u1680'
+    >>> re.findall(r'[\s\d\w]', 'hey 123', re.UNICODE)
+    ['h', 'e', 'y', ' ', '1', '2', '3']
+    >>> re.search(r'\D', '\u0661x', re.UNICODE).group(0)
+    'x'
+    >>> re.search(r'\W', '\u0401!', re.UNICODE).group(0)
+    '!'
+    >>> re.search(r'\S', '\u1680x', re.UNICODE).group(0)
+    'x'
+    >>> re.search(r'[\D]', '\u0661x', re.UNICODE).group(0)
+    'x'
+    >>> re.search(r'[\W]', '\u0401!', re.UNICODE).group(0)
+    '!'
+    >>> re.search(r'[\S]', '\u1680x', re.UNICODE).group(0)
+    'x'
+
+
+Group positions need to be fixed with unicode (This works as is now below)
+
+    >>> re.search(r' (.)', '\U0001d200xxx\u1234 x').span(1) 
+    (6, 7)
+    >>> re.search(r' (.)'.encode('utf-8'), '\U0001d200xxx\u1234 x'.encode('utf-8')).span(1) 
+    (11, 12)
+
+Pos and endpos also need to be corrected (This now works)
+
+    >>> re.compile(r'x').findall('\u1234x', 1, 2)
+    ['x']
+

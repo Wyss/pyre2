@@ -6,6 +6,7 @@ from cython.operator cimport preincrement as inc, dereference as deref
 import warnings
 from cpython.tuple cimport PyTuple_Size
 from cpython.list cimport PyList_Size
+
 I = re.I
 IGNORECASE = re.IGNORECASE
 M = re.M
@@ -44,6 +45,9 @@ def set_fallback_notification(level):
         raise ValueError("This function expects a valid notification level.")
     current_notification = level
 
+cdef extern from *:
+    cdef void emit_ifndef_py_unicode_wide "#if !defined(Py_UNICODE_WIDE) //" ()
+    cdef void emit_endif "#endif //" ()
 
 class RegexError(re.error):
     """
@@ -61,6 +65,39 @@ cdef inline bytes cpp_to_pystring(cpp_string input_str):
     # despite spurious or missing null characters.
     return input_str.c_str()[:input_str.length()]
 
+cdef int uniPairToCPair(const char* input_c_str, 
+                        Py_ssize_t in_size, 
+                        int u_start, int u_end,
+                        int* c_start, int* c_end):
+    cdef int c_pos = 0 
+    cdef int u_pos = 0
+    cdef int u_idx = u_start
+    cdef int i
+    cdef unsigned char c
+    while c_pos < in_size:
+        c = <unsigned char>input_c_str[c_pos]
+        if c < 0x80:
+            c_pos += 1 #inc(c_pos)
+            u_pos += 1 #inc(u_pos)
+        elif c < 0xe0:
+            c_pos += 2
+            u_pos += 1 #inc(u_pos)
+        elif c < 0xf0:
+            c_pos += 3
+            u_pos += 1 #inc(u_pos)
+        else:
+            c_pos += 4
+            u_pos += 1 #inc(u_pos)
+        if u_pos == u_idx:
+            if u_idx == u_start:
+                c_start[0] = c_pos
+                u_idx = u_end
+            else:
+                c_end[0] = c_pos
+                return 0
+    return -1
+
+
 cdef class Match:
     cdef StringPiece* matches
     cdef const cpp_map[cpp_string, int]* named_groups
@@ -71,6 +108,7 @@ cdef class Match:
     cdef int _endpos
     cdef object match_string
     cdef char* match_c_str
+    cdef Py_ssize_t match_c_str_len
     cdef object _pattern_object
     cdef list _groups
     cdef tuple _spans
@@ -210,15 +248,75 @@ cdef class Match:
             raise IndexError("no such group")
 
         return self._groups[idx]
+    # end def
 
+    cdef list _convert_positions(self, positions):
+        cdef char* s = self.match_c_str
+        cdef int cpos = 0
+        cdef int upos = 0
+        cdef Py_ssize_t size = self.match_c_str_len
+        cdef unsigned char c 
+        cdef int num_positions, i
+
+        new_positions = []
+        i = 0
+        num_positions = len(positions)
+        if positions[i] == -1:
+            new_positions.append(-1)
+            i += 1 #inc(i)
+            if i == num_positions:
+                return new_positions
+        if positions[i] == 0:
+            new_positions.append(0)
+            i += 1 #inc(i)
+            if i == num_positions:
+                return new_positions
+
+        while cpos < size:
+            c = <unsigned char>s[cpos]
+            if c < 0x80:
+                cpos += 1 #inc(cpos)
+                upos += 1 #inc(upos)
+            elif c < 0xe0:
+                cpos += 2
+                upos += 1 #inc(upos)
+            elif c < 0xf0:
+                cpos += 3
+                upos += 1 #inc(upos)
+            else:
+                cpos += 4
+                upos += 1 #inc(upos)
+                # wide unicode chars get 2 unichars when python is compiled with --enable-unicode=ucs2
+                # TODO: verify this
+                emit_ifndef_py_unicode_wide()
+                upos += 1 #inc(upos)
+                emit_endif()
+
+            if positions[i] == cpos:
+                new_positions.append(upos)
+                i += 1 #inc(i)
+                if i == num_positions:
+                    return new_positions
+        return new_positions
+
+    def _convert_spans(self, spans):
+        positions = [x for x, y in spans] + [y for x, y in spans]
+        positions = sorted(set(positions))
+        new_positions = self._convert_positions(positions)
+        posdict = dict(zip(positions, new_positions))
+        return [(posdict[x], posdict[y]) for x,y in spans]
 
     cdef _make_spans(self):
+        """ This needs to get fixed for unicode
+        since the indices are into the bytstring equivalent.
+        """
         if self._spans is not None:
             return
 
-        cdef int start, end
+        cdef Py_ssize_t start, end
         cdef char* s = self.match_c_str
         cdef StringPiece* piece
+
         spans = []
         for i in range(self.nmatches):
             if self.matches[i].data() == NULL:
@@ -230,6 +328,9 @@ cdef class Match:
                 start = piece.data() - s
                 end = start + piece.length()
                 spans.append((start, end))
+
+        if self._pattern_object.is_encoded:
+            spans = self._convert_spans(spans)
 
         self._spans = tuple(spans)
 
@@ -278,7 +379,6 @@ cdef class Match:
             return ''.join(items)
 
     def groupdict(self):
-        #cdef _re2.stringintmapiterator it
         cdef cpp_map[cpp_string, int].const_iterator it
         cdef dict result = {}
         cdef dict indexes = {}
@@ -297,7 +397,7 @@ cdef class Match:
                 idx = deref(it).second
                 key = cpp_to_pystring(deref(it).first).decode('utf-8')
                 indexes[key] = idx
-                val = self._groups[idx]                                              
+                val = self._groups[idx]   
                 result[key] = None if val is None else val.decode('utf-8')
                 inc(it)
         else:
@@ -389,6 +489,7 @@ cdef class Pattern:
         cdef int encoded = 0
         cdef StringPiece sp
         cdef Match m = Match(self, self.ngroups + 1)
+        cdef int re2_startpos, re2_endpos
 
         IF IS_PY_THREE == 0:
             if self.is_encoded:
@@ -397,24 +498,30 @@ cdef class Pattern:
                 in_string_b = in_string
             encoded = pystring_to_cstr(in_string_b, &input_c_str, &input_size)
         ELSE:
+
             encoded = pystring_to_cstr(in_string, &input_c_str, &input_size)
 
         if encoded == -1:
             raise TypeError("expected string or buffer")
 
-        if endpos >= 0 and endpos <= pos:
+        if endpos < 0:
+            endpos = input_size
+        if pos < 0 or pos > endpos or endpos > input_size:
             return None
 
-        if endpos >= 0 and endpos < input_size:
-            input_size = endpos
-
-        if pos > input_size:
-            return None
+        if self.is_encoded:
+            uniPairToCPair(input_c_str, input_size, 
+                            pos, endpos, 
+                            &re2_startpos, &re2_endpos)
+        else:
+            re2_startpos = pos
+            re2_endpos = endpos
 
         sp = StringPiece(input_c_str, input_size) # put on stack since a default constructor exists
         with nogil:
-            result = self.re_pattern.Match(sp, <int>pos, <int>input_size, 
+            result = self.re_pattern.Match(sp, re2_startpos, re2_endpos, 
                                     anchoring, m.matches, self.ngroups + 1)
+
         if result == 0:
             return None
 
@@ -422,6 +529,7 @@ cdef class Pattern:
         m.nmatches = self.ngroups + 1
         m.match_string = in_string
         m.match_c_str = input_c_str
+        m.match_c_str_len = input_size
         m._pos = pos
         if endpos == -1:
             m._endpos = len(in_string)
@@ -463,6 +571,7 @@ cdef class Pattern:
         cdef int i, j
         cdef object temp_in, temp_out
         cdef list reslist_out
+        cdef int re2_startpos, re2_endpos
 
         IF IS_PY_THREE == 0:
             if self.is_encoded:
@@ -476,14 +585,24 @@ cdef class Pattern:
         if encoded == -1:
             raise TypeError("expected string or buffer")
 
-        if endpos != -1 and endpos < input_size:
-            input_size = endpos
+        if endpos < 0:
+            endpos = input_size
+        if pos < 0 or pos > endpos or endpos > input_size:
+            return None
+
+        if self.is_encoded:
+            uniPairToCPair(input_c_str, input_size, 
+                            pos, endpos, 
+                            &re2_startpos, &re2_endpos)
+        else:
+            re2_startpos = pos
+            re2_endpos = endpos
 
         sp = StringPiece(input_c_str, input_size)
         while True:
             m = Match(self, self.ngroups + 1)
             with nogil:
-                result = self.re_pattern.Match(sp, <int>pos, <int>input_size, 
+                result = self.re_pattern.Match(sp, re2_startpos, re2_endpos, 
                                 UNANCHORED, m.matches, self.ngroups + 1)
             if result == 0:
                 break
@@ -491,11 +610,12 @@ cdef class Pattern:
             m.nmatches = self.ngroups + 1
             m.match_string = in_string
             m.match_c_str = input_c_str
-            m._pos = pos
-            if endpos == -1:
-                m._endpos = len(in_string)
-            else:
-                m._endpos = endpos
+            m.match_c_str_len = input_size
+
+            # storing the c_str position and NOT the unicode
+            m._pos = re2_startpos
+            m._endpos = re2_endpos
+
             if as_match:
                 if self.ngroups > 1:
                     resultlist.append(m.groups_b(b""))
@@ -503,13 +623,15 @@ cdef class Pattern:
                     resultlist.append(m.group_b(self.ngroups))
             else:
                 resultlist.append(m)
-            if pos == input_size:
+            if re2_startpos == input_size:
                 break
             # offset the pos to move to the next point
             if m.matches[0].length() == 0:
-                pos += 1
+                #pos += 1
+                re2_startpos += 1
             else:
-                pos = m.matches[0].data() - input_c_str + m.matches[0].length()
+                #pos = m.matches[0].data() - input_c_str + m.matches[0].length()
+                re2_startpos = m.matches[0].data() - input_c_str + m.matches[0].length()
         # end while
         if self.is_encoded:
             try:
@@ -676,7 +798,6 @@ cdef class Pattern:
         if repl_encoded == -1:
             raise TypeError("expected string or buffer")
 
-
         fixed_repl = NULL
         cdef const char* s = repl_c_str
         cdef const char* end = s + repl_size
@@ -720,6 +841,7 @@ cdef class Pattern:
                 in_encoded = pystring_to_cstr(in_string_b, &input_c_str, &input_size)
             ELSE:
                 in_encoded = pystring_to_cstr(in_string, &input_c_str, &input_size)
+
             if in_encoded == -1:
                 raise TypeError("expected string or buffer")
 
@@ -796,6 +918,7 @@ cdef class Pattern:
                 m.nmatches = self.ngroups + 1
                 m.match_string = in_string
                 m.match_c_str = input_c_str
+                m.match_c_str_len = input_size
 
                 if self.is_encoded:
                     resultlist.append(callback(m).encode('utf-8') or b'')
