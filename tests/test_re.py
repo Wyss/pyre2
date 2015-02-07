@@ -751,7 +751,7 @@ class ReTests(unittest.TestCase):
         self.assertRaises(OverflowError, _sre.compile, "abc", 0, [long_overflow])
 
 def run_re_tests():
-    from re_tests import benchmarks, tests, SUCCEED, FAIL, SYNTAX_ERROR
+    from re_benchmarks import benchmarks, tests, SUCCEED, FAIL, SYNTAX_ERROR
     verbose = False
     if verbose:
         print('Running re_tests test suite')
