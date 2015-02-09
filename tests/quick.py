@@ -1,3 +1,8 @@
+import sys, os
+LOCAL_DIR = os.path.abspath(os.path.dirname(__file__))
+PACKAGE_DIR = os.path.abspath(os.path.join(LOCAL_DIR, '..'))
+sys.path.append(PACKAGE_DIR)
+
 import re2
 import re
 import timeit
@@ -28,9 +33,7 @@ print(re2.escape(s) == s)
 print(re2.sub('(.)', re2.escape(s), 'x'))
 print(re2.sub('(.)', re2.escape(s), 'x') == s)
 
-import os.path as opath
-path = opath.dirname(opath.abspath(__file__))
-fn = opath.join(path, "tests", "genome.dat")
+fn = os.path.join(PACKAGE_DIR, "tests","re2_testfiles", "genome.dat")
 with open(fn, 'rb') as fd:
     genome = fd.read()
 
