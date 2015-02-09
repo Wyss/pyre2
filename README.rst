@@ -17,20 +17,19 @@ except that the stated goal of this version is to be a *drop-in replacement* for
 the ``re`` module.
 
 
-grinner This version differs from `axiak <https://github.com/axiak/pyre2>` in the following way:
+This version differs from `axiak <https://github.com/axiak/pyre2>` in the 
+following way:
 
-* Python 3 support
+* Python 3 support (untested in Python 2 but shoud work)
 * Uses the type of the pattern to determine the encoding of the output.
 Mixing types will get you zero output but it will work, as it would using 
 standard lib re module:
 
-    bytes pattern arg + bytes string --> bytes output
-    unicode pattern arg + unicode string --> unicode output
-    unicode pattern arg + bytes string --> unicode output
+    * bytes pattern arg + bytes string --> bytes output
+    * unicode pattern arg + unicode string --> unicode output
+    * unicode pattern arg + bytes string --> unicode output
 
-* Builds against google/re2 included as a submodule.  I couldn't get a linked
-library build to work on system Python in OS X (only self build Python) so 
-I went with the easiest and most portable solution for a C++
+* Builds statically against google/re2 included as a subtree instead of a library::
 
     git subtree add --prefix re2/src/re2 git@github.com:google/re2.git master --squash
 
@@ -48,9 +47,10 @@ My hope is that some will be able to go to the top of their module and put::
         import re
 
 That being said, there are features of the ``re`` module that this module may
-never have. For example, ``RE2`` does not handle lookahead assertions (``(?=...)``).
-For this reason, the module will automatically fall back to the original ``re`` module
-if there is a regex that it cannot handle.
+never have. For example, ``RE2`` does not handle lookahead assertions
+(``(?=...)``).
+For this reason, the module will automatically fall back to the original 
+``re`` module if there is a regex that it cannot handle.
 
 However, there are times when you may want to be notified of a failover. For this reason,
 I'm adding the single function ``set_fallback_notification`` to the module.
@@ -67,9 +67,11 @@ And in the above example, ``set_fallback_notification`` can handle 3 values:
 ``re.FALLBACK_QUIETLY`` (default), ``re.FALLBACK_WARNING`` (raises a warning), and
 ``re.FALLBACK_EXCEPTION`` (which raises an exception).
 
-**Note**: The re2 module treats byte strings as UTF-8. This is fully backwards compatible with 7-bit ascii.
-However, bytes containing values larger than 0x7f are going to be treated very differently in re2 than in re.
-The RE library quietly ignores invalid utf8 in input strings, and throws an exception on invalid utf8 in patterns.
+**Note**: The re2 module treats byte strings as UTF-8. This is fully backwards 
+compatible with 7-bit ascii.However, bytes containing values larger than 0x7f 
+are going to be treated very differently in re2 than in re. The RE library 
+quietly ignores invalid utf8 in input strings, and throws an exception on 
+invalid utf8 in patterns.
 For example:
 
     >>> re.findall(r'.', '\x80\x81\x82')
@@ -77,70 +79,54 @@ For example:
     >>> re2.findall(r'.', '\x80\x81\x82')
     []
 
-If you require the use of regular expressions over an arbitrary stream of bytes, then this library might not be for you.
+If you require the use of regular expressions over an arbitrary stream of bytes, 
+then this library might not be for you.
 
 Installation
 ============
 
 To install, you must first install the prerequisites:
 
-* The Python development headers (e.g. *sudo apt-get install python-dev*)
-* A build environment with ``clang++`` or ``g++`` (e.g. *sudo apt-get install build-essential*)
+* The Python development headers
+* A build environment with ``clang++`` or ``g++``
 * cython
 
 
     $ python setup.py install
 
 
-If you want to make changes to the bindings, you must have Cython >=0.13.
-
 Unicode Support
 ===============
 
-One current issue is Unicode support. As you may know, ``RE2`` supports UTF8,
-which is certainly distinct from unicode. Right now the module will automatically
-encode any unicode string into utf8 for you, which is *slow* (it also has to
-decode utf8 strings back into unicode objects on every substitution or split).
-Therefore, you are better off using bytestrings in utf8 while working with RE2
-and encoding things after everything you need done is finished.
+In Python 3 Unicode and Bytes strings using ASCII character set run almost as 
+fast as each other (semi-experimentally proven) and for most loads at least 
+twice as fast. For searching on UTF-8 Unicode using non-ascii, use the 
+``re.UNICODE`` flag to get the results properly encoded and spans properly 
+calculated.
 
-Performance
-===========
+Internally, all Unicode strings get encoded to UTF-8 and are manipulated as
+bytestrings until a call for results is made.   
 
-
-Current Status
-==============
-
-pyre2 has only received basic testing. Please use it
-and let me know if you run into any issues!
-
+bytes strings in gives bytes strings out
+unicode in gives unicode out
 
 Tests
 =====
 
-If you would like to help, one thing that would be very useful
-is writing comprehensive tests for this. It's actually really easy:
-
-* Come up with regular expression problems using the regular python 're' module.
-* Write a session in python traceback format `Example <http://github.com/axiak/pyre2/blob/master/tests/search.txt>`_.
-* Replace your ``import re`` with ``import re2 as re``.
-* Save it as a .txt file in the tests directory. You can comment on it however you like and indent the code with 4 spaces.
+run tests in ``tests/``
+More tests welcomes
 
 Missing Features
 ================
 
 Currently the features missing are:
 
-* If you use substitution methods without a callback, a non 0/1 maxsplit argument is not supported.
+* If you use substitution methods without a callback, a non 0/1 maxsplit 
+argument is not supported.
 
 
 Credits
 =======
 
-Though I ripped out the code, I'd like to thank David Reiss
-and Facebook for the initial inspiration. Plus, I got to
-gut this readme file!
-
-Moreover, this library would of course not be possible if not for
-the immense work of the team at RE2 and the few people who work
-on Cython.
+https://github.com/axiak/pyre2
+https://github.com/facebook/pyre2

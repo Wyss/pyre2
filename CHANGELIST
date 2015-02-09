@@ -1,3 +1,12 @@
+_._.0) 2015-02-09 
+    - Fork to work in Python 3 and full unicode support (grinner).
+    - New versioning numbering
+    - Fixed spans for unicode
+    - update to new cython conventions for C++
+    - attempting to by Python 2 compatible but untested
+    - including re2 source so you don't have to have system root priviledges
+        to install, good for virtualenvs
+
 0.2.12)
     - Fixed pyre2 to work with latest version of re2 (axiak) (issue #3)
 
