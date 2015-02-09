@@ -114,5 +114,5 @@ argument is not supported.
 Credits
 =======
 
-https://github.com/axiak/pyre2
-https://github.com/facebook/pyre2
+* https://github.com/axiak/pyre2
+* https://github.com/facebook/pyre2
