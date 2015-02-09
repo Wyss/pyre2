@@ -114,12 +114,22 @@ re2_ext = Extension( "re2._re2",
 is_py_3 = int(sys.version_info[0] > 2)
 cython_ext_list = cythonize(re2_ext, compile_time_env={'IS_PY_THREE': is_py_3})
 
+"""
+For Python 2 the -Wshorten-64-to-32 flag needs to not be used, so 
+we need to overide the CFLAGS for Unicode to work.  So if you see a bunch
+of warnings re-run with below:
+
+CFLAGS="-O3" python setup.py install
+or
+CFLAGS="-O3" python setup.py build_ext --inplace
+"""
+
 setup(
     name="re2",
     maintainer=get_authors(),
     packages=['re2'],
     ext_modules=cython_ext_list,
-    version="0.2.20",
+    version="0.3.33",
     description=DESCRIPTION,
     long_description=get_long_description(),
     package_data={'re2': re2_files},

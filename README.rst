@@ -20,7 +20,7 @@ the ``re`` module.
 This version differs from `axiak <https://github.com/axiak/pyre2>`_ in the 
 following way:
 
-* Python 3 support (untested in Python 2 but should work with a little grease)
+* Python 3 support (no test suite for Python 2 but looks promising)
 * Uses the type of the pattern to determine the encoding of the output.
 Mixing types will get you zero output but it will work, as it would using 
 standard lib re module:
@@ -70,7 +70,7 @@ And in the above example, ``set_fallback_notification`` can handle 3 values:
 Installation
 ============
 
-To install, you must first install the prerequisites:
+To install in Python 3, you must first install the prerequisites:
 
 * The Python development headers
 * A build environment with ``clang++`` or ``g++``
@@ -80,6 +80,18 @@ Then run::
     
     $ python setup.py install
 
+For Python 2 the -Wshorten-64-to-32 flag needs to not be used (shows up on OS X)
+, so we need to overide the CFLAGS for Unicode to work.  First run::
+
+    $ python setup.py build_ext --inplace
+
+
+So if you see a bunch of warnings re-run with below::
+
+    
+    $ CFLAGS="-O3" python setup.py install
+
+and it has been shown to work.
 
 Unicode Support
 ===============
