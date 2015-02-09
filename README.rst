@@ -17,7 +17,7 @@ except that the stated goal of this version is to be a *drop-in replacement* for
 the ``re`` module.
 
 
-This version differs from `axiak <https://github.com/axiak/pyre2>` in the 
+This version differs from `axiak <https://github.com/axiak/pyre2>`_ in the 
 following way:
 
 * Python 3 support (untested in Python 2 but shoud work)
