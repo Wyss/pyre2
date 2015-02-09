@@ -20,7 +20,7 @@ the ``re`` module.
 This version differs from `axiak <https://github.com/axiak/pyre2>`_ in the 
 following way:
 
-* Python 3 support (untested in Python 2 but shoud work)
+* Python 3 support (untested in Python 2 but should work with a little grease)
 * Uses the type of the pattern to determine the encoding of the output.
 Mixing types will get you zero output but it will work, as it would using 
 standard lib re module:
