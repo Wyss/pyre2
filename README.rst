@@ -25,9 +25,9 @@ following way:
 Mixing types will get you zero output but it will work, as it would using 
 standard lib re module:
 
-    * bytes pattern arg + bytes string --> bytes output
-    * unicode pattern arg + unicode string --> unicode output
-    * unicode pattern arg + bytes string --> unicode output
+* bytes pattern arg + bytes string --> bytes output
+* unicode pattern arg + unicode string --> unicode output
+* unicode pattern arg + bytes string --> unicode output
 
 * Builds statically against google/re2 included as a subtree instead of a library::
 
