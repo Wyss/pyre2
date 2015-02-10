@@ -37,7 +37,6 @@ fn = os.path.join(PACKAGE_DIR, "tests","re2_testfiles", "genome.dat")
 with open(fn, 'rb') as fd:
     genome = fd.read()
 
-
 search = b"(?P<cupcake>c[cg]cg[ag]g)"
 
 re2_regex = re2.compile(search)

@@ -9,7 +9,6 @@ To add a test, you can add a function to the bottom of this page that uses the
 import it.
 """
 from timeit import Timer
-# import simplejson
 import json
 import sys
 import os
@@ -39,9 +38,6 @@ test = tests[%r]
 """
 
 current_re = [None]
-
-
-
 
 def main(tests):
     benchmarks = {}
@@ -112,9 +108,6 @@ def benchmarks_to_ReST(benchmarks):
         print_divider()
 
 
-
-
-
 ###############################################
 # Tests for performance
 ###############################################
@@ -133,38 +126,15 @@ def register_test(name, pattern, num_runs = 100, **data):
         return wrapped_f
     return decorator
 
-# class register_test(object):
-
-#     def __init__(self, name, pattern, num_runs = 100, **data):
-#         self.name = name
-#         self.pattern = pattern
-#         self.num_runs = num_runs
-#         self.data = data
-
-#     def __call__(self, method):
-#         """
-#         If there are decorator arguments, __call__() is only called
-#         once, as part of the decoration process! You can only give
-#         it a single argument, which is the function object.
-#         """
-#         global tests
-#         print("decing", self.name)
-#         tests[self.name] = method
-#         method.pattern = self.pattern
-#         method.num_runs = self.num_runs
-#         method.data = self.data
-#         def wrapped_f(*args):
-#             method(*args)
-#         return wrapped_f
-
 # This is the only function to get data right now,
 # but I could imagine other functions as well.
 _wikidata = None
 def getwikidata():
     global _wikidata
     if _wikidata is None:
-        _wikidata = gzip.open('wikipages.xml.gz', 'r').read()
-    # print("wikipages", type(_wikidata))
+        with gzip.open(os.path.join('re2_testfiles', 'wikipages.xml.gz'),
+                                        'r') as fd:
+            _wikidata = fd.read()
     return _wikidata
 
 
@@ -181,63 +151,34 @@ def findall_uriemail(pattern, data):
     return len(a)
 
 
-
-# @register_test("Replace WikiLinks",
-#              r'(\[\[(^\|)+.*?\]\])'.encode('utf-8'),
-#              data=getwikidata())
-# def replace_wikilinks(pattern, data):
-#     """
-#     This test replaces links of the form [[Obama|Barack_Obama]] to Obama.
-#     """
-#     return len(pattern.sub(b'\\1', data))
-
+@register_test("Replace WikiLinks",
+             r'(\[\[(^\|)+.*?\]\])'.encode('utf-8'),
+             data=getwikidata())
+def replace_wikilinks(pattern, data):
+    """
+    This test replaces links of the form [[Obama|Barack_Obama]] to Obama.
+    """
+    return len(pattern.sub(b'\\1', data))
 
 
-# register_test("Remove WikiLinks",
-#              r'(\[\[(^\|)+.*?\]\])'.encode('utf-8'),
-#              data=getwikidata())
-# def remove_wikilinks(pattern, data):
-#     """
-#     This test replaces links of the form [[Obama|Barack_Obama]] to the empty string
-#     """
-#     return len(pattern.sub(b'', data))
+@register_test("Remove WikiLinks",
+             r'(\[\[(^\|)+.*?\]\])'.encode('utf-8'),
+             data=getwikidata())
+def remove_wikilinks(pattern, data):
+    """
+    This test replaces links of the form [[Obama|Barack_Obama]] to the empty string
+    """
+    return len(pattern.sub(b'', data))
 
 
-
-
-
-# @register_test("Remove WikiLinks",
-#              r'(<page[^>]*>)'.encode('utf-8'),
-#              data=getwikidata())
-# def split_pages(pattern, data):
-#     """
-#     This test splits the data by the <page> tag.
-#     """
-#     return len(pattern.split(data))
-
-
-# def getweblogdata():
-#     # return open(os.path.join(os.path.dirname(__file__), 'access.log'))
-#     return open('access.log', 'rb')
-
-# @register_test("weblog scan",
-#                #r'^(\S+) (\S+) (\S+) \[(\d{1,2})/(\w{3})/(\d{4}):(\d{2}):(\d{2}):(\d{2}) -(\d{4})\] "(\S+) (\S+) (\S+)" (\d+) (\d+|-) "([^"]+)" "([^"]+)"\n',
-# #               '(\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) ? (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (".*?"|-) (\S+) (\S+) (\S+) (\S+)',
-#                '(\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) ? (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+) (\S+)'.encode('utf-8'),
-#                data=getweblogdata())
-# def weblog_matches(pattern, data):
-#     """
-#     Match weblog data line by line.
-#     """
-#     total=0
-#     for line in data.read()[:20000].splitlines():
-#         p = pattern.search(line)
-#         #for p in pattern.finditer(data.read()[:20000]):
-#         if p:
-#             total += len(p.groups())
-#     data.seek(0)
-
-#     return 0
+@register_test("Remove WikiLinks",
+             r'(<page[^>]*>)'.encode('utf-8'),
+             data=getwikidata())
+def split_pages(pattern, data):
+    """
+    This test splits the data by the <page> tag.
+    """
+    return len(pattern.split(data))
 
 if __name__ == '__main__':
     main(tests)
