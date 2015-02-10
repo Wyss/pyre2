@@ -14,11 +14,14 @@ find at `facebook's github repository <http://github.com/facebook/pyre2/>`_
 except that the stated goal of this version is to be a *drop-in replacement* for
 the ``re`` module.
 
+YMMV but for many situations this module performs at least <hand wavy> 2X as 
+fast as ``re``.
 
-This version differs from `axiak <https://github.com/axiak/pyre2>`_ in the 
-following way:
 
-* Python 3 support (no test suite for Python 2 but looks promising)
+This version differs from `axiak <https://github.com/axiak/pyre2>`_ branch in
+the following way:
+
+* Python 3 support (no test suite for Python 2 but it subjectively works)
 * Uses the type of the pattern to determine the encoding of the output.
 * Builds statically against google/re2 included as a subtree instead of a library::
 
@@ -72,12 +75,12 @@ Then run::
     $ python setup.py install
 
 For Python 2 the -Wshorten-64-to-32 flag needs to not be used (shows up on OS X)
-, so we need to overide the CFLAGS for Unicode to work.  First run::
+, so we need to overide the CFLAGS for Unicode to work.  First run as a check::
 
     $ python setup.py build_ext --inplace
 
 
-So if you see a bunch of warnings re-run with below::
+If you see a bunch of warnings re-run with below::
 
     
     $ CFLAGS="-O3" python setup.py install
@@ -107,7 +110,7 @@ Tests
 =====
 
 run tests in ``tests/``
-More tests welcomes
+More tests welcome
 
 Missing Features
 ================
@@ -120,6 +123,7 @@ argument is not supported.
 
 Credits
 =======
+These branches started this:
 
 * https://github.com/axiak/pyre2
 * https://github.com/facebook/pyre2
