@@ -1,9 +1,9 @@
 MANIFEST
-/build
-/dist
-src/re2.html
-src/re2.so
-re2.so
+build
+*.so
+re2/_re2.cpp
+__pycache__
 *~
 *.pyc
 *.swp
+.DS_Store
