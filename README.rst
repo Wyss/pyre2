@@ -2,8 +2,6 @@
 pyre2
 =====
 
-.. contents::
-
 Summary
 =======
 
@@ -22,13 +20,6 @@ following way:
 
 * Python 3 support (no test suite for Python 2 but looks promising)
 * Uses the type of the pattern to determine the encoding of the output.
-Mixing types will get you zero output but it will work, as it would using 
-standard lib re module:
-
-* bytes pattern arg + bytes string --> bytes output
-* unicode pattern arg + unicode string --> unicode output
-* unicode pattern arg + bytes string --> unicode output
-
 * Builds statically against google/re2 included as a subtree instead of a library::
 
     git subtree add --prefix re2/src/re2 git@github.com:google/re2.git master --squash
@@ -105,8 +96,12 @@ calculated.
 Internally, all Unicode strings get encoded to UTF-8 and are manipulated as
 bytestrings until a call for results is made.   
 
-bytes strings in gives bytes strings out
-unicode in gives unicode out
+Mixing types will get you zero output but it will work, as it would using 
+standard lib re module:
+
+* bytes pattern arg + bytes string --> bytes output
+* unicode pattern arg + unicode string --> unicode output
+* unicode pattern arg + bytes string --> unicode output
 
 Tests
 =====
