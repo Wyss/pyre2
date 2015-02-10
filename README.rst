@@ -22,7 +22,7 @@ following way:
 * Uses the type of the pattern to determine the encoding of the output.
 * Builds statically against google/re2 included as a subtree instead of a library::
 
-    git subtree add --prefix re2/src/re2 git@github.com:google/re2.git master --squash
+    git subtree add --prefix re2_cpp git@github.com:google/re2.git master --squash
 
 * Updated cython C++ code for newer cython features.
 
